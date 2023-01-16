@@ -4,6 +4,7 @@ import styled from "styled-components";
 import { Button } from "../../components/Button/Button";
 import { Form } from "../../components/Form/Form";
 import { Input } from "../../components/Input/Input";
+import { LOCAL_STORAGE_JWT_TOKEN_KEY } from "../../constants/constants";
 import { UserContext } from "../../contexts/UserContextWrapper";
 
 const LoginContainer = styled.div`
@@ -62,7 +63,9 @@ export const Login = () => {
             return res.json();
         })
         .then((data) => {
-            setUser(data);
+            const { id, name, token } = data;
+            localStorage.setItem(LOCAL_STORAGE_JWT_TOKEN_KEY, token);
+            setUser({ id, name });
             setIsLoading(false);
             setError('');
             navigate('/');
@@ -81,14 +84,12 @@ export const Login = () => {
                     placeholder="Name" 
                     onChange={(e) => setName(e.target.value)}
                     value={name}
-                    required
                 />
                 <Input 
                     placeholder="Password" 
                     type="password"
                     onChange={(e) => setPassword(e.target.value)}
                     value={password}
-                    required
                 />
                 {error && <ErrorStyled>{error}</ErrorStyled>}
                 <Button>Login</Button>

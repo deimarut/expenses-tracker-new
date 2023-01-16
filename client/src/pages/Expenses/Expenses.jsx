@@ -3,7 +3,8 @@ import styled from 'styled-components';
 import { Button } from "../../components/Button/Button";
 import { Form } from "../../components/Form/Form";
 import { Input } from "../../components/Input/Input";
-import { UserContext } from "../../contexts/UserContextWrapper";
+import { UserContext } from '../../contexts/UserContextWrapper';
+import { LOCAL_STORAGE_JWT_TOKEN_KEY } from '../../constants/constants';
 
 const ExpensesList = styled.ul`
     display: flex;
@@ -44,10 +45,16 @@ export const Expenses = () => {
     const { user } = useContext(UserContext);
 
     useEffect(() => {
-        fetch(`${process.env.REACT_APP_API_URL}/expenses?userId=${user.id}`)
+        fetch(`${process.env.REACT_APP_API_URL}/expenses?userId=${user.id}`, {
+            headers: {
+                authorization: 'Bearer ' + localStorage.getItem(LOCAL_STORAGE_JWT_TOKEN_KEY)
+            }
+        })
             .then(res => res.json())
             .then(data => {
-                setExpenses(data);
+                if (!data.error) {
+                    setExpenses(data);
+                }
                 setIsLoading(false);
             });
     }, [user.id]);
@@ -60,7 +67,8 @@ export const Expenses = () => {
         fetch(`${process.env.REACT_APP_API_URL}/expenses`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json', 
+                authorization: 'Bearer ' + localStorage.getItem(LOCAL_STORAGE_JWT_TOKEN_KEY)
             },
             body: JSON.stringify({
                 type, 
@@ -70,9 +78,11 @@ export const Expenses = () => {
         })
         .then((res) => res.json())
         .then((data) => {
-            setExpenses(data);
-            setType('');
-            setAmount('');
+            if (!data.error) {
+                setExpenses(data);
+                setType('');
+                setAmount('');
+            }
         });
     }
 
