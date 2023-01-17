@@ -28,10 +28,15 @@ const connection = mysql.createConnection(mysqlConfig);
 //     });
 // });
 
+const getUserFromToken = (req) => {
+    const token = req.headers.authorization.split(' ')[1];
+    const user = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    return user;
+}
+
 const verifyToken = (req, res, next) => {
     try {
-        const token = req.headers.authorization.split(' ')[1];
-        jwt.verify(token, process.env.JWT_SECRET_KEY);
+        getUserFromToken(req);
         next();
     } catch(e) {
         res.send({ error: 'Invalid Token' });
@@ -39,19 +44,48 @@ const verifyToken = (req, res, next) => {
 }
 
 app.get('/expenses', verifyToken, (req, res) => {
-    const { userId } = req.query;
+    const user = getUserFromToken(req);
     
-    connection.execute('SELECT * FROM expenses WHERE userId=?', [userId], (err, expenses) => {
+    connection.execute('SELECT * FROM expenses WHERE userId=?', [user.id], (err, expenses) => {
         res.send(expenses);
     });
 });
 
 app.post('/expenses', verifyToken, (req, res) => {
-    const { type, amount, userId } = req.body;
+    const { type, amount, timestamp } = req.body;
+    const { id } = getUserFromToken(req);
+
+    const sqlQuery = timestamp ?
+    'INSERT INTO expenses (type, amount, userId, timestamp) VALUES (?, ?, ?, ?)' :
+    'INSERT INTO expenses (type, amount, userId) VALUES (?, ?, ?)';
+
+    const data = [type, amount, id];
+    if (timestamp) {
+        data.push(timestamp);
+    }
 
     connection.execute(
-        'INSERT INTO expenses (type, amount, userId) VALUES (?, ?, ?)',
-        [type, amount, userId],
+        sqlQuery,
+        data,
+        () => {
+            connection.execute(
+                'SELECT * FROM expenses WHERE userId=?', 
+                [id], 
+                (err, expenses) => {
+                    res.send(expenses);
+                }
+            )
+        }
+    )
+});
+
+app.delete('/expenses/:id', verifyToken, (req, res) => {
+    const { id } = req.params;
+    const { id: userId } = getUserFromToken(req);
+
+    connection.execute(
+        'DELETE FROM expenses WHERE id=? AND userId=?',
+        [id, userId],
         () => {
             connection.execute(
                 'SELECT * FROM expenses WHERE userId=?', 
@@ -95,7 +129,7 @@ app.post('/login', (req, res) => {
                 const isPasswordCorrect = bcrypt.compareSync(password, passwordHash);
                 if (isPasswordCorrect) {
                     const { id, name } = result[0];
-                    const token = jwt.sign({ id, name }, process.env.JWT_SECRET_KEY, { expiresIn: '55s' });
+                    const token = jwt.sign({ id, name }, process.env.JWT_SECRET_KEY);
                     res.send({ token, id, name });
                 } else {
                     res.sendStatus(401);
@@ -108,10 +142,10 @@ app.post('/login', (req, res) => {
 app.get('/token/verify', (req, res) => {
     try {
         const token = req.headers.authorization.split(' ')[1];
-        const user = jwt.verify(token, JWT_SECRET_KEY);
+        const user = jwt.verify(token, process.env.JWT_SECRET_KEY);
         res.send(user);
     } catch(e) {
-        res.send({ error: "invalid token" });
+        res.send({ error: 'Invalid Token' });
     }
 });
 
